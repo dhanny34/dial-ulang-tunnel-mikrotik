@@ -1,0 +1,34 @@
+# nama tunnel dan list ip yang mau dicoba
+:local sstpName "NAMA-TUNNEL"
+:local ipList {"X.X.X.X"; "Y.Y.Y.Y"; "Z.Z.Z.Z"}
+:local connected false
+
+# Cek dulu apa konek atau putus si tunnel
+:local currentStatus [/interface sstp-client get [find name=$sstpName] running]
+:if ($currentStatus = true) do={
+    :log info ("SCRIPT-DIAL >> " . $sstpName . " sudah terkoneksi. Tidak perlu melakukan reconnect.")
+    :set connected true
+} else={
+    :foreach ip in=$ipList do={
+        :if (!$connected) do={
+            :log info ("SCRIPT-DIAL >> Mencoba koneksi " . $sstpName . " ke IP " . $ip)
+            /interface sstp-client set [find name=$sstpName] connect-to=$ip disabled=no
+            :delay 15s
+            
+            :local status [/interface sstp-client get [find name=$sstpName] running]
+            :if ($status = true) do={
+                :set connected true
+                :log info ("SCRIPT-DIAL >> " . $sstpName . " berhasil terkoneksi ke " . $ip)
+            } else={
+                :log warning ("SCRIPT-DIAL >> " . $sstpName . " gagal terkoneksi ke " . $ip)
+                /interface sstp-client set [find name=$sstpName] disabled=yes
+                :delay 5s
+                /interface sstp-client set [find name=$sstpName] disabled=no
+            }
+        }
+    }
+}
+
+:if (!$connected) do={
+    :log error ("SCRIPT-DIAL >> Gagal koneksi SSTP ke semua IP yang tersedia")
+}
